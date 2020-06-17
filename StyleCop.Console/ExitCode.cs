@@ -9,6 +9,7 @@ namespace StyleCop.Console
     enum ExitCode
     {
         Passed = 0,
-        Failed = 1
+        Failed = 1,
+        InValid = 2,
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Reflection;
+using System.Xml;
 
 namespace StyleCop.Console
 {
@@ -10,6 +11,7 @@ namespace StyleCop.Console
 
         public static int Main(string[] args)
         {
+            System.Console.OutputEncoding = System.Text.Encoding.UTF8;
             try
             {
                 var arguments = new RunnerArguments(args);
@@ -17,15 +19,15 @@ namespace StyleCop.Console
                 if (arguments.Help)
                 {
                     ShowHelp();
-                    return (int) ExitCode.Failed;
+                    return (int) ExitCode.InValid;
                 }
 
-                if (string.IsNullOrWhiteSpace(arguments.ProjectPath) || !Directory.Exists(arguments.ProjectPath))
+                if (string.IsNullOrWhiteSpace(arguments.ProjectPath) || (!Directory.Exists(arguments.ProjectPath) && !File.Exists(arguments.ProjectPath)))
                 {
                     ShowHelp();
                     System.Console.WriteLine("");
                     System.Console.WriteLine("ERROR: Invalid or no path specified \"{0}\"!", arguments.ProjectPath);
-                    return (int) ExitCode.Failed;
+                    return (int) ExitCode.InValid;
                 }
 
                 var settings = !string.IsNullOrWhiteSpace(arguments.SettingsLocation)
@@ -38,29 +40,36 @@ namespace StyleCop.Console
 
                 var outputFile = arguments.OutputFile;
 
-                return ProcessFolder(settings, projectPath, outputFile, searchOption);
+                return ProcessFileOrFolder(settings, projectPath, outputFile, searchOption);
             }
             catch (Exception ex)
             {
                 System.Console.WriteLine("An unhandled exception occured: {0}", ex);
-                return (int) ExitCode.Failed;
+                return (int) ExitCode.InValid;
             }
         }
 
-        private static int ProcessFolder(string settings, string projectPath, string outputFile, SearchOption searchOption)
+        private static int ProcessFileOrFolder(string settings, string path, string outputFile, SearchOption searchOption)
         {
             var console = new StyleCopConsole(settings, false, outputFile, null, true);
-            var project = new CodeProject(0, projectPath, new Configuration(null));
-
-            foreach (var file in Directory.EnumerateFiles(projectPath, "*.cs", searchOption))
+            var project = new CodeProject(0, path, new Configuration(null));
+            
+            if(Path.GetExtension(path) == ".cs")
             {
-                //TODO: This is pretty hacky. Have to figure out a better way to exclude packages and/or make this configurable.
-                if (file.Contains("\\packages\\"))
+                console.Core.Environment.AddSourceCode(project, path, null);
+            }
+            else
+            {
+                foreach (var file in Directory.EnumerateFiles(path, "*.cs", searchOption))
                 {
-                    continue;
+                    //TODO: This is pretty hacky. Have to figure out a better way to exclude packages and/or make this configurable.
+                    if (file.Contains("\\packages\\"))
+                    {
+                        continue;
+                    }
+                
+                    console.Core.Environment.AddSourceCode(project, file, null);
                 }
-
-                console.Core.Environment.AddSourceCode(project, file, null);
             }
 
             console.OutputGenerated += OnOutputGenerated;
